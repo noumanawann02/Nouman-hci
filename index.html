@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Usability & Visibility Tracker</title>
+
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: Arial, sans-serif;
+        background: #f4f6f9;
+        color: #222;
+      }
+
+      header {
+        background: #222;
+        color: white;
+        padding: 20px;
+        text-align: center;
+      }
+
+      header h1 {
+        margin-bottom: 8px;
+      }
+
+      .container {
+        width: 90%;
+        max-width: 1100px;
+        margin: 30px auto;
+      }
+
+      .status-card {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      .status {
+        font-weight: bold;
+      }
+
+      .visible {
+        color: green;
+      }
+
+      .hidden {
+        color: red;
+      }
+
+      .buttons {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 15px;
+      }
+
+      button {
+        border: none;
+        padding: 10px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        background: #333;
+        color: white;
+      }
+
+      button:hover {
+        background: #555;
+      }
+
+      .demo-area {
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        min-height: 250px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      .demo-buttons {
+        display: flex;
+        gap: 15px;
+        margin-top: 20px;
+        flex-wrap: wrap;
+      }
+
+      .demo-buttons button {
+        background: #007bff;
+      }
+
+      .demo-buttons button:hover {
+        background: #0056b3;
+      }
+
+      input {
+        margin-top: 20px;
+        padding: 12px;
+        width: 100%;
+        max-width: 400px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+      }
+
+      .logs {
+        background: #111;
+        color: #00ff66;
+        padding: 20px;
+        border-radius: 10px;
+        height: 350px;
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 13px;
+        white-space: pre-wrap;
+      }
+
+      .info {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-top: 15px;
+      }
+
+      .info-box {
+        background: #f1f1f1;
+        padding: 15px;
+        border-radius: 6px;
+      }
+
+      .click-dot {
+        position: absolute;
+        width: 14px;
+        height: 14px;
+        background: rgba(255, 0, 0, 0.7);
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 99999;
+        transform: translate(-50%, -50%);
+      }
+    </style>
+  </head>
+
+  <body>
+    <header>
+      <h1>Usability & Visibility Tracker</h1>
+      <p>Track clicks, mouse movement and page visibility</p>
+    </header>
+
+    <div class="container">
+      <div class="status-card">
+        <h2>Page Visibility</h2>
+
+        <p>
+          Current Status:
+          <span id="visibilityStatus" class="status visible"> Visible </span>
+        </p>
+
+        <div class="info">
+          <div class="info-box">
+            <strong>Session ID</strong>
+            <p id="sessionId"></p>
+          </div>
+
+          <div class="info-box">
+            <strong>Total Events</strong>
+            <p id="eventCount">0</p>
+          </div>
+
+          <div class="info-box">
+            <strong>Clicks</strong>
+            <p id="clickCount">0</p>
+          </div>
+
+          <div class="info-box">
+            <strong>Mouse Movements</strong>
+            <p id="mouseCount">0</p>
+          </div>
+
+          <div class="info-box">
+            <strong>Visibility Changes</strong>
+            <p id="visibilityCount">0</p>
+          </div>
+        </div>
+
+        <div class="buttons">
+          <button onclick="UsabilityTracker.exportData()">Export JSON</button>
+
+          <button onclick="UsabilityTracker.renderClickOverlay()">
+            Show Click Overlay
+          </button>
+
+          <button onclick="UsabilityTracker.clearLogs()">Clear Logs</button>
+        </div>
+      </div>
+
+      <div class="demo-area">
+        <h2>Test Area</h2>
+
+        <p>
+          Click the buttons, move your mouse and type something to generate
+          usability tracking events.
+        </p>
+
+        <div class="demo-buttons">
+          <button id="buttonOne">Button One</button>
+
+          <button id="buttonTwo">Button Two</button>
+
+          <button id="buttonThree">Button Three</button>
+        </div>
+
+        <input type="text" placeholder="Type something here..." />
+      </div>
+
+      <div class="status-card">
+        <h2>Live Activity Logs</h2>
+
+        <br />
+
+        <div id="logs" class="logs">Waiting for activity...</div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        const usabilityLogs = [];
+
+        const SESSION_ID =
+          "session_" + Math.random().toString(36).substring(2, 9);
+
+        document.getElementById("sessionId").textContent = SESSION_ID;
+
+        function updateDashboard() {
+          document.getElementById("eventCount").textContent =
+            usabilityLogs.length;
+
+          document.getElementById("clickCount").textContent =
+            usabilityLogs.filter((e) => e.eventType === "click").length;
+
+          document.getElementById("mouseCount").textContent =
+            usabilityLogs.filter((e) => e.eventType === "mousemove").length;
+
+          document.getElementById("visibilityCount").textContent =
+            usabilityLogs.filter((e) => e.eventType === "visibility").length;
+
+          const logsBox = document.getElementById("logs");
+
+          if (usabilityLogs.length === 0) {
+            logsBox.textContent = "Waiting for activity...";
+
+            return;
+          }
+
+          logsBox.textContent = usabilityLogs
+            .slice()
+            .reverse()
+            .map((log) => JSON.stringify(log, null, 2))
+            .join("\n\n");
+        }
+
+        document.addEventListener(
+          "click",
+          function (event) {
+            const targetElement = event.target;
+
+            const isSensitive =
+              targetElement.tagName === "INPUT" ||
+              targetElement.tagName === "TEXTAREA" ||
+              targetElement.isContentEditable;
+
+            const safeText = isSensitive
+              ? "[REDACTED]"
+              : (targetElement.innerText || "")
+                  .substring(0, 30)
+                  .replace(/\s+/g, " ")
+                  .trim();
+
+            const logEntry = {
+              sessionId: SESSION_ID,
+
+              eventType: "click",
+
+              timestamp: new Date().toISOString(),
+
+              timeOffsetMs: Math.round(performance.now()),
+
+              targetTag: targetElement.tagName,
+
+              targetId: targetElement.id || null,
+
+              targetClass:
+                typeof targetElement.className === "string"
+                  ? targetElement.className
+                  : null,
+
+              targetText: safeText,
+
+              x: event.pageX,
+
+              y: event.pageY,
+
+              viewportW: window.innerWidth,
+
+              viewportH: window.innerHeight,
+            };
+
+            usabilityLogs.push(logEntry);
+
+            updateDashboard();
+          },
+          true,
+        );
+
+        let lastMoveTime = 0;
+
+        document.addEventListener("mousemove", function (event) {
+          const now = performance.now();
+
+          if (now - lastMoveTime > 250) {
+            usabilityLogs.push({
+              sessionId: SESSION_ID,
+
+              eventType: "mousemove",
+
+              timestamp: new Date().toISOString(),
+
+              x: event.pageX,
+
+              y: event.pageY,
+            });
+
+            lastMoveTime = now;
+
+            updateDashboard();
+          }
+        });
+
+        document.addEventListener("visibilitychange", function () {
+          const isVisible = document.visibilityState === "visible";
+
+          const statusElement = document.getElementById("visibilityStatus");
+
+          if (isVisible) {
+            statusElement.textContent = "Visible";
+
+            statusElement.className = "status visible";
+          } else {
+            statusElement.textContent = "Hidden";
+
+            statusElement.className = "status hidden";
+          }
+
+          usabilityLogs.push({
+            sessionId: SESSION_ID,
+
+            eventType: "visibility",
+
+            visibilityState: document.visibilityState,
+
+            timestamp: new Date().toISOString(),
+
+            timeOffsetMs: Math.round(performance.now()),
+          });
+
+          updateDashboard();
+        });
+
+        window.addEventListener("pagehide", function () {
+          if (usabilityLogs.length > 0) {
+            console.log("Final usability logs:", usabilityLogs);
+          }
+        });
+
+        window.UsabilityTracker = {
+          getLogs: function () {
+            return usabilityLogs;
+          },
+
+          exportData: function () {
+            const json = JSON.stringify(usabilityLogs, null, 2);
+
+            const blob = new Blob([json], {
+              type: "application/json",
+            });
+
+            const url = URL.createObjectURL(blob);
+
+            const link = document.createElement("a");
+
+            link.href = url;
+
+            link.download = "usability-logs-" + SESSION_ID + ".json";
+
+            link.click();
+
+            URL.revokeObjectURL(url);
+          },
+
+          clearLogs: function () {
+            usabilityLogs.length = 0;
+
+            updateDashboard();
+          },
+
+          renderClickOverlay: function () {
+            document
+              .querySelectorAll(".click-dot")
+              .forEach((dot) => dot.remove());
+
+            usabilityLogs
+              .filter((e) => e.eventType === "click")
+              .forEach((log) => {
+                const dot = document.createElement("div");
+
+                dot.className = "click-dot";
+
+                dot.style.left = log.x + "px";
+
+                dot.style.top = log.y + "px";
+
+                document.body.appendChild(dot);
+              });
+          },
+        };
+
+        updateDashboard();
+      })();
+    </script>
+  </body>
+</html>
